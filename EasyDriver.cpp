@@ -36,10 +36,6 @@ void EasyDriver::reset() {
 
 
 void EasyDriver::enable(bool enabled) {
-    if (this->enabled == enabled) {
-        return;
-    }
-
     if (enabled) {
         digitalWrite(PIN_ENABLE, LOW);
     } else {

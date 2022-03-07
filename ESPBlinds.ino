@@ -23,16 +23,23 @@ PubSubClient mqttClient(espClient);
 // Up   = Reverse == open
 // Down = EASYDRIVER_MODE_FULL_STEP
 // Up   = EASYDRIVER_MODE_QUARTER_STEP
-const int MODE_CLOSE = EASYDRIVER_MODE_HALF_STEP;
+const int DELAY_CLOSE = 1200;
+const int MODE_CLOSE = EASYDRIVER_MODE_FULL_STEP;
+
+//const int DELAY_OPEN = 2000;
+//const int MODE_OPEN = EASYDRIVER_MODE_FULL_STEP;
+
+const int DELAY_OPEN = 1100;
 const int MODE_OPEN = EASYDRIVER_MODE_QUARTER_STEP;
+
 const int DIRECTION_CLOSE = EASYDRIVER_DIRECTION_FORWARDS;
 const int DIRECTION_OPEN = EASYDRIVER_DIRECTION_REVERSE;
 
-const int STEPS_VERTICAL = 6500;
+const int STEPS_VERTICAL = 15000;
 const int STEPS_TO_CLOSE = STEPS_VERTICAL * MODE_CLOSE;
 const int STEPS_TO_OPEN = STEPS_VERTICAL * MODE_OPEN;
 
-const bool MQTT_SEND_STEPS = true;
+const bool MQTT_SEND_STEPS = false;
 
 float currentStep = 0.0;
 int currentMode = MODE_OPEN;
@@ -46,7 +53,6 @@ void setup() {
   pinMode(PIN_CUTOFF_OPEN, INPUT_PULLUP);
 
   stepper.reset();
-  stepper.setDelay(1000);
 
   Serial.begin(115200);
   while (! Serial);
@@ -59,6 +65,7 @@ void setup() {
   }
   mqttPublish(MQTT_TOPIC_STEPS, currentStep);
   mqttPublish(MQTT_TOPIC_STATE, "closed");
+  mqttPublish(MQTT_TOPIC_ENABLED, 0);
 
   mqttClient.subscribe(MQTT_TOPIC_CONTROL_ENABLED);
   mqttClient.subscribe(MQTT_TOPIC_CONTROL_DIRECTION);
@@ -139,9 +146,9 @@ void setStepperMode(int mode) {
 void setStepperEnabled(bool enabled) {
   stepper.enable(enabled);
   
-  if (enabled && !stepperEnabled) {
+  if (enabled) {
     mqttPublish(MQTT_TOPIC_ENABLED, 1); 
-  } else if (!enabled && stepperEnabled) {
+  } else if (!enabled) {
     mqttPublish(MQTT_TOPIC_ENABLED, 0); 
   }
   stepperEnabled = enabled;
@@ -151,8 +158,10 @@ void setStepperDirection(int direction) {
   stepper.setDirection(direction);
   stepDirection = direction;
   if (direction == EASYDRIVER_DIRECTION_FORWARDS) {
+    stepper.setDelay(DELAY_CLOSE);
     mqttPublish(MQTT_TOPIC_DIRECTION, "forwards");
   } else {
+    stepper.setDelay(DELAY_OPEN);
     mqttPublish(MQTT_TOPIC_DIRECTION, "reverse");
   }
 }
