@@ -28,7 +28,7 @@ bool stepperEnabled = true;
 // Down = EASYDRIVER_MODE_FULL_STEP
 // Up   = EASYDRIVER_MODE_QUARTER_STEP
 const int MODE_CLOSE = EASYDRIVER_MODE_HALF_STEP;
-const int MODE_OPEN = EASYDRIVER_MODE_EIGHTH_STEP;
+const int MODE_OPEN = EASYDRIVER_MODE_QUARTER_STEP;
 const int DIRECTION_CLOSE = EASYDRIVER_DIRECTION_FORWARDS;
 const int DIRECTION_OPEN = EASYDRIVER_DIRECTION_REVERSE;
 
@@ -41,7 +41,7 @@ void setup() {
   pinMode(PIN_CUTOFF_OPEN, INPUT_PULLUP);
 
   stepper.reset();
-  stepper.setDelay(800);
+  stepper.setDelay(1000);
 
   Serial.begin(115200);
   while (! Serial);
