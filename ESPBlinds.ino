@@ -19,10 +19,6 @@ EasyDriver stepper = EasyDriver(PIN_STEP, PIN_DIR, PIN_MS1, PIN_MS2, PIN_ENABLE)
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
 
-u_int64_t currentStep = 0;
-int stepDirection = EASYDRIVER_DIRECTION_FORWARDS;
-bool stepperEnabled = true;
-
 // Down = forwards == close
 // Up   = Reverse == open
 // Down = EASYDRIVER_MODE_FULL_STEP
@@ -35,6 +31,15 @@ const int DIRECTION_OPEN = EASYDRIVER_DIRECTION_REVERSE;
 const int STEPS_VERTICAL = 6500;
 const int STEPS_TO_CLOSE = STEPS_VERTICAL * MODE_CLOSE;
 const int STEPS_TO_OPEN = STEPS_VERTICAL * MODE_OPEN;
+
+const bool MQTT_SEND_STEPS = true;
+
+float currentStep = 0.0;
+int currentMode = MODE_OPEN;
+int stepDirection = EASYDRIVER_DIRECTION_FORWARDS;
+bool stepperEnabled = true;
+bool isOpening = false;
+bool isClosing = false;
 
 void setup() {
   pinMode(PIN_CUTOFF_CLOSE, INPUT_PULLUP);
@@ -53,6 +58,7 @@ void setup() {
     mqttReconnect();
   }
   mqttPublish(MQTT_TOPIC_STEPS, currentStep);
+  mqttPublish(MQTT_TOPIC_STATE, "closed");
 
   mqttClient.subscribe(MQTT_TOPIC_CONTROL_ENABLED);
   mqttClient.subscribe(MQTT_TOPIC_CONTROL_DIRECTION);
@@ -73,15 +79,23 @@ void loop() {
 
 
 void closeBlinds() {
+  isClosing = true;
+  mqttPublish(MQTT_TOPIC_STATE, "closing");
   setStepperDirection(DIRECTION_CLOSE);
   setStepperMode(MODE_CLOSE);
   stepFor(STEPS_TO_CLOSE);
+  mqttPublish(MQTT_TOPIC_STATE, "closed");
+  isClosing = false;
 }
 
 void openBlinds() {
+  isOpening = true;
+  mqttPublish(MQTT_TOPIC_STATE, "opening");
   setStepperDirection(DIRECTION_OPEN);
   setStepperMode(MODE_OPEN);
   stepFor(STEPS_TO_OPEN); 
+  mqttPublish(MQTT_TOPIC_STATE, "opened");
+  isOpening = false;
 }
 
 
@@ -99,8 +113,18 @@ void stepFor(int steps) {
       Serial.println("ABORT OPEN");
       break;
     }
+    if (!stepperEnabled) {
+      break;
+    }
     stepper.step();
-    currentStep += stepDirection;
+    currentStep += stepDirection / currentMode;
+    
+    // if (MQTT_SEND_STEPS) {
+    //   if (currentStep % 250 == 0) {
+    //     mqttPublish(MQTT_TOPIC_STEPS, currentStep);
+    //   }
+      
+    // }
     mqttClient.loop();
   }
   setStepperEnabled(false);
@@ -108,6 +132,7 @@ void stepFor(int steps) {
 
 void setStepperMode(int mode) {
   stepper.setMode(mode);
+  currentMode = mode;
   mqttPublish(MQTT_TOPIC_MODE, mode);
 }
 
@@ -161,9 +186,9 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       value += (char)payload[i];
   }
 
-  Serial.println("mqttCallback !");
-  Serial.println(topicStr);
-  Serial.println(value);
+  // Serial.println("mqttCallback !");
+  // Serial.println(topicStr);
+  // Serial.println(value);
 
   if (topicStr == MQTT_TOPIC_CONTROL_ENABLED) {
     if (value.equals("1")) {
@@ -192,22 +217,11 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   }
 
   if (topicStr == MQTT_TOPIC_CONTROL_BLINDS) {
-    if (value.equals("open")) {
+    if (value.equals("opened") && !isOpening) {
       openBlinds();
-    } else if (value.equals("close")) {
+    } else if (value.equals("closed") && !isClosing) {
       closeBlinds();
     }
-  }
-
-  
-  if (value.equals("1")) {
-    setStepperEnabled(true);
-  } else if (value.equals("0")) {
-    setStepperEnabled(false);
-  } else if (value.equals("open")) {
-    openBlinds();
-  } else if (value.equals("close")) {
-    closeBlinds();
   }
 }
 
