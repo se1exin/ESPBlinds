@@ -27,17 +27,22 @@ const int DIRECTION_OPEN = EASYDRIVER_DIRECTION_REVERSE;
 
 const bool MQTT_SEND_STEPS = false;
 
-// Updatable via MQTT and saved into EEPROM
-int EEPROM_MAGIC_NUMBER = 33457;
-int STEPS_VERTICAL = 15000;
+// Vars that are updatable via MQTT and saved into EEPROM...
 
-int DELAY_CLOSE = 1200;
+// If this number is not found in EEPROM, then we assume no EEPROM values exist/have been saved
+// and all other EEPROM values should be discarded/fallback to default values.
+// See loadFromEeprom()
+int EEPROM_MAGIC_NUMBER = 10000;
+int STEPS_VERTICAL = 15000; // Number of full steps required to complete open/close sequence
+
+int DELAY_CLOSE = 1200; // In micros
 int MODE_CLOSE = EASYDRIVER_MODE_FULL_STEP;
 
-int DELAY_OPEN = 1100;
-int MODE_OPEN = EASYDRIVER_MODE_QUARTER_STEP;
+int DELAY_OPEN = 1100; // In micros
+int MODE_OPEN = EASYDRIVER_MODE_QUARTER_STEP; // More torque is required to open then close
 
-float currentStep = 0.0;
+// Locals
+int currentStep = 0;
 int currentMode = MODE_OPEN;
 int stepDirection = EASYDRIVER_DIRECTION_FORWARDS;
 bool stepperEnabled = true;
@@ -45,6 +50,7 @@ bool isOpening = false;
 bool isClosing = false;
 
 void setup() {
+  // Cut off switches (not used in hardware, but implemented in case required in future)
   pinMode(PIN_CUTOFF_CLOSE, INPUT_PULLUP);
   pinMode(PIN_CUTOFF_OPEN, INPUT_PULLUP);
 
@@ -64,17 +70,14 @@ void setup() {
   mqttPublish(MQTT_TOPIC_STATE, "closed");
   mqttPublish(MQTT_TOPIC_STEPS, currentStep);
   loadFromEeprom();
-  mqttPublish(MQTT_TOPIC_MODE_OPEN, MODE_OPEN);
-  mqttPublish(MQTT_TOPIC_MODE_CLOSE, MODE_CLOSE);
-  mqttPublish(MQTT_TOPIC_DELAY_OPEN, DELAY_OPEN);
-  mqttPublish(MQTT_TOPIC_DELAY_CLOSE, DELAY_CLOSE);
-  mqttPublish(MQTT_TOPIC_STEPS_VERTICAL, STEPS_VERTICAL);
 
+  // Topic for controlling the stepper remotely
   mqttClient.subscribe(MQTT_TOPIC_CONTROL_ENABLED);
   mqttClient.subscribe(MQTT_TOPIC_CONTROL_DIRECTION);
   mqttClient.subscribe(MQTT_TOPIC_CONTROL_STEPFOR);
   mqttClient.subscribe(MQTT_TOPIC_CONTROL_BLINDS);
 
+  // Topics for updating EEPROM values remotely
   mqttClient.subscribe(MQTT_TOPIC_CONTROL_MODE_OPEN);
   mqttClient.subscribe(MQTT_TOPIC_CONTROL_MODE_CLOSE);
   mqttClient.subscribe(MQTT_TOPIC_CONTROL_DELAY_OPEN);
@@ -99,7 +102,7 @@ void closeBlinds() {
   mqttPublish(MQTT_TOPIC_STATE, "closing");
   setStepperDirection(DIRECTION_CLOSE);
   setStepperMode(MODE_CLOSE);
-  stepFor(STEPS_VERTICAL * MODE_CLOSE);
+  stepFor(STEPS_VERTICAL);
   mqttPublish(MQTT_TOPIC_STATE, "closed");
   isClosing = false;
 }
@@ -109,7 +112,7 @@ void openBlinds() {
   mqttPublish(MQTT_TOPIC_STATE, "opening");
   setStepperDirection(DIRECTION_OPEN);
   setStepperMode(MODE_OPEN);
-  stepFor(STEPS_VERTICAL * MODE_OPEN); 
+  stepFor(STEPS_VERTICAL); 
   mqttPublish(MQTT_TOPIC_STATE, "opened");
   isOpening = false;
 }
@@ -121,6 +124,14 @@ void openBlinds() {
 void stepFor(int steps) {
   setStepperEnabled(true);
   for (int i = 0; i < steps; i++) {
+
+    // Stepping mode is effectively a multiplier on the desired number of steps
+    // E.g. a quarter step mode, to achieve a full step we need to do 4x stepper steps
+    for (int x = 0; x < currentMode; x++) {
+      stepper.step();
+    }
+
+    currentStep += stepDirection;
     if (stepDirection == DIRECTION_CLOSE && digitalRead(PIN_CUTOFF_CLOSE) == LOW) {
       Serial.println("ABORT CLOSE");
       break;
@@ -132,16 +143,15 @@ void stepFor(int steps) {
     if (!stepperEnabled) {
       break;
     }
-    stepper.step();
-    currentStep += stepDirection / currentMode;
     
-    // if (MQTT_SEND_STEPS) {
-    //   if (currentStep % 250 == 0) {
-    //     mqttPublish(MQTT_TOPIC_STEPS, currentStep);
-    //   }
-      
-    // }
-    mqttClient.loop();
+    if (MQTT_SEND_STEPS) {
+      if (currentStep % 250 == 0) {
+        mqttPublish(MQTT_TOPIC_STEPS, currentStep);
+      }
+    }
+    if (i % 50 == 0) {
+      mqttClient.loop();
+    }
   }
   setStepperEnabled(false);
 }
@@ -204,9 +214,9 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       value += (char)payload[i];
   }
 
-  // Serial.println("mqttCallback !");
-  // Serial.println(topicStr);
-  // Serial.println(value);
+  Serial.println("mqttCallback !");
+  Serial.println(topicStr);
+  Serial.println(value);
 
   if (topicStr == MQTT_TOPIC_CONTROL_ENABLED) {
     if (value.equals("1")) {
@@ -226,11 +236,6 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
   if (topicStr == MQTT_TOPIC_CONTROL_STEPFOR) {
     int steps = value.toInt();
-    if (stepDirection == DIRECTION_CLOSE) {
-      steps = steps * MODE_CLOSE;
-    } else {
-      steps = steps * MODE_OPEN;
-    }
     stepFor(steps);
   }
 
@@ -246,15 +251,15 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     MODE_OPEN = value.toInt();
     saveToEeprom();
   }
-  if (topicStr == MQTT_TOPIC_MODE_CLOSE) {
+  if (topicStr == MQTT_TOPIC_CONTROL_MODE_CLOSE) {
     MODE_CLOSE = value.toInt();
     saveToEeprom();
   }
-  if (topicStr == MQTT_TOPIC_DELAY_OPEN) {
+  if (topicStr == MQTT_TOPIC_CONTROL_DELAY_OPEN) {
     DELAY_OPEN = value.toInt();
     saveToEeprom();
   }
-  if (topicStr == MQTT_TOPIC_DELAY_CLOSE) {
+  if (topicStr == MQTT_TOPIC_CONTROL_DELAY_CLOSE) {
     DELAY_CLOSE = value.toInt();
     saveToEeprom();
   }
@@ -337,6 +342,12 @@ void loadFromEeprom() {
     Serial.println(EEPROM_MAGIC_NUMBER);
     Serial.print("Keeping default step config!");
   }
+
+  mqttPublish(MQTT_TOPIC_MODE_OPEN, MODE_OPEN);
+  mqttPublish(MQTT_TOPIC_MODE_CLOSE, MODE_CLOSE);
+  mqttPublish(MQTT_TOPIC_DELAY_OPEN, DELAY_OPEN);
+  mqttPublish(MQTT_TOPIC_DELAY_CLOSE, DELAY_CLOSE);
+  mqttPublish(MQTT_TOPIC_STEPS_VERTICAL, STEPS_VERTICAL);
 }
 
 void saveToEeprom() {
