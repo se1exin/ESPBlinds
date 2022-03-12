@@ -5,15 +5,16 @@
 #include "EasyDriver.h"
 
 // Outputs
-const int PIN_STEP = 2;
-const int PIN_DIR = 4;
-const int PIN_MS1 = 5;
-const int PIN_MS2 = 12;
-const int PIN_ENABLE = 16;
+const int PIN_STEP = 4;
+const int PIN_DIR = 5;
+const int PIN_MS1 = -1;
+const int PIN_MS2 = -1;
+const int PIN_ENABLE = 14;
+const int PIN_FAN = 13;
 
 // Inputs
-const int PIN_CUTOFF_CLOSE = 13;
-const int PIN_CUTOFF_OPEN = 14;
+//const int PIN_CUTOFF_CLOSE = 0;
+//const int PIN_CUTOFF_OPEN = 3;
 
 EasyDriver stepper = EasyDriver(PIN_STEP, PIN_DIR, PIN_MS1, PIN_MS2, PIN_ENABLE);
 
@@ -32,14 +33,14 @@ const bool MQTT_SEND_STEPS = false;
 // If this number is not found in EEPROM, then we assume no EEPROM values exist/have been saved
 // and all other EEPROM values should be discarded/fallback to default values.
 // See loadFromEeprom()
-int EEPROM_MAGIC_NUMBER = 10000;
+int EEPROM_MAGIC_NUMBER = 10001;
 int STEPS_VERTICAL = 15000; // Number of full steps required to complete open/close sequence
 
-int DELAY_CLOSE = 1200; // In micros
+int DELAY_CLOSE = 500; // In micros
 int MODE_CLOSE = EASYDRIVER_MODE_FULL_STEP;
 
-int DELAY_OPEN = 1100; // In micros
-int MODE_OPEN = EASYDRIVER_MODE_QUARTER_STEP; // More torque is required to open then close
+int DELAY_OPEN = 500; // In micros
+int MODE_OPEN = EASYDRIVER_MODE_FULL_STEP;
 
 // Locals
 int currentStep = 0;
@@ -51,8 +52,9 @@ bool isClosing = false;
 
 void setup() {
   // Cut off switches (not used in hardware, but implemented in case required in future)
-  pinMode(PIN_CUTOFF_CLOSE, INPUT_PULLUP);
-  pinMode(PIN_CUTOFF_OPEN, INPUT_PULLUP);
+//  pinMode(PIN_CUTOFF_CLOSE, INPUT_PULLUP);
+//  pinMode(PIN_CUTOFF_OPEN, INPUT_PULLUP);
+  pinMode(PIN_FAN, OUTPUT);
 
   stepper.reset();
 
@@ -124,7 +126,8 @@ void openBlinds() {
 void stepFor(int steps) {
   setStepperEnabled(true);
   for (int i = 0; i < steps; i++) {
-
+//    Serial.print("STEP");
+//    Serial.println(i);
     // Stepping mode is effectively a multiplier on the desired number of steps
     // E.g. a quarter step mode, to achieve a full step we need to do 4x stepper steps
     for (int x = 0; x < currentMode; x++) {
@@ -132,14 +135,14 @@ void stepFor(int steps) {
     }
 
     currentStep += stepDirection;
-    if (stepDirection == DIRECTION_CLOSE && digitalRead(PIN_CUTOFF_CLOSE) == LOW) {
-      Serial.println("ABORT CLOSE");
-      break;
-    }
-    if (stepDirection == DIRECTION_OPEN && digitalRead(PIN_CUTOFF_OPEN) == LOW) {
-      Serial.println("ABORT OPEN");
-      break;
-    }
+//    if (stepDirection == DIRECTION_CLOSE && digitalRead(PIN_CUTOFF_CLOSE) == LOW) {
+//      Serial.println("ABORT CLOSE");
+//      break;
+//    }
+//    if (stepDirection == DIRECTION_OPEN && digitalRead(PIN_CUTOFF_OPEN) == LOW) {
+//      Serial.println("ABORT OPEN");
+//      break;
+//    }
     if (!stepperEnabled) {
       break;
     }
@@ -149,9 +152,7 @@ void stepFor(int steps) {
         mqttPublish(MQTT_TOPIC_STEPS, currentStep);
       }
     }
-    if (i % 50 == 0) {
-      mqttClient.loop();
-    }
+    mqttClient.loop();
   }
   setStepperEnabled(false);
 }
@@ -166,8 +167,10 @@ void setStepperEnabled(bool enabled) {
   stepper.enable(enabled);
   
   if (enabled) {
+    digitalWrite(PIN_FAN, HIGH);
     mqttPublish(MQTT_TOPIC_ENABLED, 1); 
-  } else if (!enabled) {
+  } else {
+    digitalWrite(PIN_FAN, LOW);
     mqttPublish(MQTT_TOPIC_ENABLED, 0); 
   }
   stepperEnabled = enabled;
@@ -241,8 +244,10 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
   if (topicStr == MQTT_TOPIC_CONTROL_BLINDS) {
     if (value.equals("opened") && !isOpening) {
+    // if (value.equals("opened")) {
       openBlinds();
     } else if (value.equals("closed") && !isClosing) {
+    // } else if (value.equals("closed")) {
       closeBlinds();
     }
   }
