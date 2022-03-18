@@ -32,7 +32,7 @@ Ball-chain gear attachment (another angle)
 
 ---
 
-![Control Board](img/gear1.jpg)
+![Control Board](img/board.jpg)
 
 Control Board (with A4988 instead of DRV8255 stepper driver)
 
