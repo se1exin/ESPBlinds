@@ -21,19 +21,35 @@ Most notably on the DRV8255, the VDD pin is not present and instead replaced by 
 ### Some more pics
 
 ![Gear](img/gear.jpg)
+
 Main gear with ball-chain gear attachment
 
+---
+
 ![Ball-Chain attachment](img/gear1.jpg)
+
 Ball-chain gear attachment (another angle)
 
+---
+
 ![Control Board](img/gear1.jpg)
+
 Control Board (with A4988 instead of DRV8255 stepper driver)
 
+---
+
 ![Housing with stepper](img/stepper-only.jpg)
+
 Housing with stepper motor and gear installed
 
+---
+
 ![Housing with stepper and board](img/stepper-board.jpg)
+
 Housing with stepper motorm, gears, and board installed
 
+---
+
 ![Housing with stepper and board](img/without-lid.jpg)
+
 Everything ready to go, just need to put the lid on
