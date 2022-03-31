@@ -9,6 +9,7 @@ The code has been tested on Arduino IDE v1.8.19 on Linux and Mac, if you have is
 
 ### Constants file
 **IMPORTANT: You need to create constants.h**
+
 Copy-paste the file `constants.example.h` to `constants.h` and fill update at minimum the following variables:
  - `WIFI_SSID`
  - `WIFI_PASSWORD`
