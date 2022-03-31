@@ -1,6 +1,33 @@
 # ESPBlinds - Wifi Controlled Roller Blinds
 
-STLs are available at: https://www.thingiverse.com/thing:5321952
+STLs are available in the [stl](stl) folder in this repo, and on thingiverse at: https://www.thingiverse.com/thing:5321952
+
+## Arduino Program
+This Repo contains the Arduino program used to run the ESP-8266 controller.
+
+The code has been tested on Arduino IDE v1.8.19 on Linux and Mac, if you have issues compiling please try using this version of the Arduino IDE.
+
+### Constants file
+**IMPORTANT: You need to create constants.h**
+Copy-paste the file `constants.example.h` to `constants.h` and fill update at minimum the following variables:
+ - `WIFI_SSID`
+ - `WIFI_PASSWORD`
+ - `MQTT_SERVER`
+ - `MQTT_USER`
+ - `MQTT_PASSWORD`
+
+All MQTT topics are also defined in `constants.h`, feel free to customise these if you prefer different topic naming.
+
+### Arduino Libraries 
+Please ensure the following Arduino Libraries are installed using the Arduino Library Manager:
+ - ESP8266WiFi - https://arduino-esp8266.readthedocs.io/en/latest/esp8266wifi/readme.html
+ - PubSubClient -  https://www.arduino.cc/reference/en/libraries/pubsubclient/
+
+### Compiling for ESP8266
+If you are using the ESP-12F modukle as I did, use the following Board settings in Arduino IDE:
+- Board: `NodeMCU 1.0 (ESP-12E)`
+- Upload Speed: `115200`
+- (I left all other settings as the default)
 
 ## Parts used
  - 2.8v 1.7A Stepper Driver (SY42STH38-1684A): https://www.pololu.com/product/2267
