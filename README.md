@@ -1,6 +1,6 @@
 # ESPBlinds - Wifi Controlled Roller Blinds
 
-STLs are available in the [stl](stl) folder in this repo, and on thingiverse at: https://www.thingiverse.com/thing:5321952
+STLs are available in the [files](files) folder in this repo, and on thingiverse at: https://www.thingiverse.com/thing:5321952
 
 ## Arduino Program
 This Repo contains the Arduino program used to run the ESP-8266 controller.
