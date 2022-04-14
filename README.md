@@ -29,7 +29,175 @@ Most notably on the DRV8255, the VDD pin is not present and instead replaced by 
 - Then put in the main gear and everything else
 - Then add on the lid!
 
-### Some more pics
+## MQTT Topics
+The unit is controlled remotely via MQTT, as I use Home Assistant and the MQTT integration for all my home automation projects.
+
+See `constants.example.h` for all the available topics - you can also change the topic stings to whatever you want.
+
+The topics are grouped into two types: Control and Non-Control topics. Control topics have `control` somewhere in the name, and the unit listens to these topics and does something (e.g. moves the blinds) when a message is received on the topic. Non-control topics don't have the word `control` in the them, and are used to send messages out from the unit to let the world know it's current states and settings.
+
+### Control Topics
+
+#### `MQTT_TOPIC_CONTROL_ENABLED`
+Enables/Disables the Stepper Motor Driver - useful for emergency stopping the motor
+
+Expected Values:
+ - `0` - Disable
+ - `1` - Enable
+
+#### `MQTT_TOPIC_CONTROL_DIRECTION`
+Changes the direction of the stepper motor/the direction the blinds will move
+
+Expected Values:
+ - `0` - Open/Up
+ - `1` - Close/Down
+
+#### `MQTT_TOPIC_CONTROL_STEPFOR`
+Immediately move the stepper motor X *full* steps, in the currently set direction (e.g. set via `MQTT_TOPIC_CONTROL_DIRECTION`).
+
+Expected Value: An integer for the number of steps
+
+#### `MQTT_TOPIC_CONTROL_BLINDS`
+Tell the blinds to either open or close, for the set number of steps required to complete the journey (e.g. set via `MQTT_TOPIC_CONTROL_STEPS_VERTICAL`)
+
+Expected Values:
+ - `opened` - Open the blinds
+ - `closed` - Close the blinds
+
+#### `MQTT_TOPIC_CONTROL_MODE_OPEN`
+Set the stepper mode used during *Opening* of Blinds (e.g. full step, half step, quarter step, etc)
+
+**This value is saved to eeprom, so it will persist if the ESP8266 restarts or looses power**
+
+Expected Values:
+ - `1` - Full Step Mode
+ - `2` - Half Step Mode
+ - `4` - Quarter Step Mode
+ - `8` - Eighth Step Mode
+
+#### `MQTT_TOPIC_CONTROL_MODE_CLOSE`
+Set the stepper mode used during *Closing* of Blinds (e.g. full step, half step, quarter step, etc)
+
+**This value is saved to eeprom, so it will persist if the ESP8266 restarts or looses power**
+
+Expected Values:
+ - `1` - Full Step Mode
+ - `2` - Half Step Mode
+ - `4` - Quarter Step Mode
+ - `8` - Eighth Step Mode
+
+
+#### `MQTT_TOPIC_CONTROL_DELAY_OPEN`
+Set the stepper speed used during *Opening* of Blinds. (Less speed == more torque).
+
+**This value is saved to eeprom, so it will persist if the ESP8266 restarts or looses power**
+
+Expected Value: An integer for the **microseconds** between steps
+
+#### `MQTT_TOPIC_CONTROL_DELAY_CLOSE`
+Set the stepper speed used during *Closing* of Blinds. (Less speed == more torque).
+
+**This value is saved to eeprom, so it will persist if the ESP8266 restarts or looses power**
+
+Expected Value: An integer for the **microseconds** between steps
+
+#### `MQTT_TOPIC_CONTROL_STEPS_VERTICAL`
+Set the number of steps to take when performing a full `open` or `close` cycle (See `MQTT_TOPIC_CONTROL_BLINDS`)
+
+**This value is saved to eeprom, so it will persist if the ESP8266 restarts or looses power**
+
+Expected Value: An integer for the number of steps to take
+
+## Non-Control Topics
+
+#### `MQTT_TOPIC_STATE`
+Publishes the current movement state of the blinds
+
+Expected Values:
+ - `opening`
+ - `opened`
+ - `closing`
+ - `closed`
+
+#### `MQTT_TOPIC_STATE`
+Publishes the current movement state of the blinds
+
+Expected Values:
+ - `opening`
+ - `opened`
+ - `closing`
+ - `closed`
+
+#### `MQTT_TOPIC_STEPS`
+Publishes the current number of full steps taken (note this is only sent every 250 steps)
+
+Expected Value: Integer
+
+#### `MQTT_TOPIC_ENABLED`
+Publishes if the stepper motor driver is currently enabled
+
+Expected Values:
+ - `0` - Not Enabled
+ - `1` - Enabled
+
+#### `MQTT_TOPIC_DIRECTION`
+Publishes the current stepper motor direction
+
+Expected Values:
+ - `forwards`
+ - `backwards`
+
+#### `MQTT_TOPIC_MODE`
+Publishes the current stepper motor step mode
+
+Expected Values:
+ - `1` - Full Step Mode
+ - `2` - Half Step Mode
+ - `4` - Quarter Step Mode
+ - `8` - Eighth Step Mode
+
+#### `MQTT_TOPIC_STATUS`
+Publishes the current MQTT connection status
+
+Expected Values:
+ - `connected` - The unit is connected to MQTT
+ - `disconnected` - The unit has disconnected from MQTT (this is sent as an MQTT last-will message, so it is mostly reliable)
+
+#### `MQTT_TOPIC_MODE_OPEN`
+Publishes the current step mode for the *Opening* sequence (see `MQTT_TOPIC_CONTROL_MODE_OPEN`)
+
+Expected Values:
+ - `1` - Full Step Mode
+ - `2` - Half Step Mode
+ - `4` - Quarter Step Mode
+ - `8` - Eighth Step Mode
+
+#### `MQTT_TOPIC_MODE_CLOSE`
+Publishes the current step mode setting for the *Closing* sequence (see `MQTT_TOPIC_CONTROL_MODE_CLOSE`)
+
+Expected Values:
+ - `1` - Full Step Mode
+ - `2` - Half Step Mode
+ - `4` - Quarter Step Mode
+ - `8` - Eighth Step Mode
+
+
+#### `MQTT_TOPIC_DELAY_OPEN`
+Publishes the current step speed setting for the *Opening* sequence (see `MQTT_TOPIC_CONTROL_DELAY_OPEN`)
+
+Expected Value: Integer
+
+#### `MQTT_TOPIC_DELAY_CLOSE`
+Publishes the current step speed setting for the *Closing* sequence (see `MQTT_TOPIC_CONTROL_DELAY_CLOSE`)
+
+Expected Value: Integer
+
+#### `MQTT_TOPIC_STEPS_VERTICAL`
+Publishes the setting for the current number of full steps to take when performing a full `open` or `close` cycle (see `MQTT_TOPIC_CONTROL_STEPS_VERTICAL`)
+
+Expected Value: Integer
+
+## Some more pics
 
 ![Gear](img/gear.jpg)
 
