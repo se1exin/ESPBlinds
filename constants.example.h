@@ -4,8 +4,8 @@ const char *WIFI_PASSWORD = "your password";
 
 // MQTT connection details
 const char *MQTT_SERVER = "x.x.x.x";
-const char *MQTT_USER = "username"; // NULL for no authentication
-const char *MQTT_PASSWORD = "password"; // NULL for no authentication
+const char *MQTT_USER;
+const char *MQTT_PASSWORD;
 
 #define MQTT_TOPIC_CONTROL_ENABLED "home/esp8266_blinds_01/control/enabled"
 #define MQTT_TOPIC_CONTROL_DIRECTION "home/esp8266_blinds_01/control/direction"
