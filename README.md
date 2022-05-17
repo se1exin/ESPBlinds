@@ -260,3 +260,7 @@ Housing with stepper motorm, gears, and board installed
 ![Housing with stepper and board](img/without-lid.jpg)
 
 Everything ready to go, just need to put the lid on
+
+
+## License
+MIT - see [LICENSE.md](https://github.com/se1exin/ESPBlinds/blob/master/LICENSE.md)
