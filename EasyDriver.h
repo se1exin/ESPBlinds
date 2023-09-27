@@ -24,7 +24,7 @@ private:
     bool enabled;
     int currentMode;
     int direction;
-    int delayMillis;
+    int delayMicros;
 
 public:
     /**

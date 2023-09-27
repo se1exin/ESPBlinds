@@ -34,22 +34,17 @@ If you are using the ESP-12F modukle as I did, use the following Board settings 
  - 2.8v 1.7A Stepper Driver (SY42STH38-1684A): https://www.pololu.com/product/2267
  - DRV8825 Stepper Motor Driver: https://www.pololu.com/product/2133
  - ESP8266 12-F: https://www.katranji.com/tocimages/files/423280-229082.pdf
- - 12v DC 50mm Fan: https://core-electronics.com.au/extruder-50mm-fan.html
  - 12v 2A DC Power Supply (no link - just make sure the amperage is higher than your stepper, with some room to breath to also run the ESP8266)
- - 4x8x3mm Bearings for the main gear - https://core-electronics.com.au/makeblock-plain-ball-bearing-4-8-3mm-10-pack.html
+ - 3.3v Regulator: https://core-electronics.com.au/voltage-regulator-3-3v.html
  - M3x8mm screws (x4) for mounting the motor
  - M3x4mm screws (x4) for mounting the lid
  - 4x wood screws to mount the whole thing to the wall - you will need to decide the best screws to use based on what your wall is made out of.
 
-...and some generic electronics components, such as 3.3v regulator, capacitors, resistors, and NPN transistors.
+...and some generic electronics components, such as capacitors and 10K resistors.
 
 See the schematic for full details
 
 ![Schematic](img/schematic.png)
-
-**NOTE** The schematic shows the A4988 Stepper Driver, which was from a previous iteration. I am now using the DRV8255 which has a slightly different pinout.
-
-Most notably on the DRV8255, the VDD pin is not present and instead replaced by the FAULT pin (which I am not using), and the RST and SLP pins go to 3.3v rather than being tied to each other.
 
 ## Mounting instructions
 - First mount the enclosure to the wall. The motor covers one of the screw holes.
@@ -91,50 +86,6 @@ Tell the blinds to either open or close, for the set number of steps required to
 Expected Values:
  - `opened` - Open the blinds
  - `closed` - Close the blinds
-
-#### `MQTT_TOPIC_CONTROL_MODE_OPEN`
-Set the stepper mode used during *Opening* of Blinds (e.g. full step, half step, quarter step, etc)
-
-**This value is saved to eeprom, so it will persist if the ESP8266 restarts or looses power**
-
-Expected Values:
- - `1` - Full Step Mode
- - `2` - Half Step Mode
- - `4` - Quarter Step Mode
- - `8` - Eighth Step Mode
-
-#### `MQTT_TOPIC_CONTROL_MODE_CLOSE`
-Set the stepper mode used during *Closing* of Blinds (e.g. full step, half step, quarter step, etc)
-
-**This value is saved to eeprom, so it will persist if the ESP8266 restarts or looses power**
-
-Expected Values:
- - `1` - Full Step Mode
- - `2` - Half Step Mode
- - `4` - Quarter Step Mode
- - `8` - Eighth Step Mode
-
-
-#### `MQTT_TOPIC_CONTROL_DELAY_OPEN`
-Set the stepper speed used during *Opening* of Blinds. (Less speed == more torque).
-
-**This value is saved to eeprom, so it will persist if the ESP8266 restarts or looses power**
-
-Expected Value: An integer for the **microseconds** between steps
-
-#### `MQTT_TOPIC_CONTROL_DELAY_CLOSE`
-Set the stepper speed used during *Closing* of Blinds. (Less speed == more torque).
-
-**This value is saved to eeprom, so it will persist if the ESP8266 restarts or looses power**
-
-Expected Value: An integer for the **microseconds** between steps
-
-#### `MQTT_TOPIC_CONTROL_STEPS_VERTICAL`
-Set the number of steps to take when performing a full `open` or `close` cycle (See `MQTT_TOPIC_CONTROL_BLINDS`)
-
-**This value is saved to eeprom, so it will persist if the ESP8266 restarts or looses power**
-
-Expected Value: An integer for the number of steps to take
 
 ## Non-Control Topics
 
@@ -199,31 +150,6 @@ Expected Values:
  - `2` - Half Step Mode
  - `4` - Quarter Step Mode
  - `8` - Eighth Step Mode
-
-#### `MQTT_TOPIC_MODE_CLOSE`
-Publishes the current step mode setting for the *Closing* sequence (see `MQTT_TOPIC_CONTROL_MODE_CLOSE`)
-
-Expected Values:
- - `1` - Full Step Mode
- - `2` - Half Step Mode
- - `4` - Quarter Step Mode
- - `8` - Eighth Step Mode
-
-
-#### `MQTT_TOPIC_DELAY_OPEN`
-Publishes the current step speed setting for the *Opening* sequence (see `MQTT_TOPIC_CONTROL_DELAY_OPEN`)
-
-Expected Value: Integer
-
-#### `MQTT_TOPIC_DELAY_CLOSE`
-Publishes the current step speed setting for the *Closing* sequence (see `MQTT_TOPIC_CONTROL_DELAY_CLOSE`)
-
-Expected Value: Integer
-
-#### `MQTT_TOPIC_STEPS_VERTICAL`
-Publishes the setting for the current number of full steps to take when performing a full `open` or `close` cycle (see `MQTT_TOPIC_CONTROL_STEPS_VERTICAL`)
-
-Expected Value: Integer
 
 ## Some more pics
 

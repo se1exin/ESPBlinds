@@ -5,6 +5,8 @@
 #include "Arduino.h"
 #include "EasyDriver.h"
 
+#define MODE_CHANGE_DELAY_MS 50
+
 EasyDriver::EasyDriver(int pinStep, int pinDir, int pinMs1, int pinMs2, int pinEnable) {
   PIN_STEP = pinStep;
   PIN_DIR = pinDir;
@@ -21,7 +23,7 @@ EasyDriver::EasyDriver(int pinStep, int pinDir, int pinMs1, int pinMs2, int pinE
   enabled = false;
   currentMode = EASYDRIVER_MODE_FULL_STEP;
   direction = EASYDRIVER_DIRECTION_FORWARDS;
-  delayMillis = 1000;
+  delayMicros = 1000;
 }
 
 // Reset Easy Driver pins to default states
@@ -32,16 +34,19 @@ void EasyDriver::reset() {
   digitalWrite(PIN_MS2, LOW);
   enable(false);
   setDelay(1000);
+  delay(MODE_CHANGE_DELAY_MS);
 }
 
 
 void EasyDriver::enable(bool enabled) {
   if (enabled) {
-    digitalWrite(PIN_ENABLE, LOW);
-  } else {
     digitalWrite(PIN_ENABLE, HIGH);
+    
+  } else {
+    digitalWrite(PIN_ENABLE, LOW);
   }
   this->enabled = enabled;
+  delay(MODE_CHANGE_DELAY_MS);
 }
 
 void EasyDriver::setMode(int mode) {
@@ -77,6 +82,7 @@ void EasyDriver::setMode(int mode) {
       break;
   }
   this->currentMode = mode;
+  delay(MODE_CHANGE_DELAY_MS);
 }
 
 
@@ -91,17 +97,18 @@ void EasyDriver::setDirection(int direction) {
   }
 
   this->direction = direction;
+  delay(MODE_CHANGE_DELAY_MS);
 }
 
-void EasyDriver::setDelay(int millis) {
-  this->delayMillis = millis;
+void EasyDriver::setDelay(int _micros) {
+  this->delayMicros = _micros;
 }
 
 void EasyDriver::step() {
   digitalWrite(PIN_STEP, HIGH);
-  delayMicroseconds(delayMillis);
+  delayMicroseconds(delayMicros);
   digitalWrite(PIN_STEP, LOW);
-  delayMicroseconds(delayMillis);
+  delayMicroseconds(delayMicros);
 }
 
 void EasyDriver::stepForward() {

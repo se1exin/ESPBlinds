@@ -1,20 +1,17 @@
 #include <ESP8266WiFi.h>
-#include <EEPROM.h>
+#include <ESP8266mDNS.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
 #include <PubSubClient.h>
 #include "constants.h"
 #include "EasyDriver.h"
 
 // Outputs
-const int PIN_STEP = 4;
-const int PIN_DIR = 5;
-const int PIN_MS1 = -1;
-const int PIN_MS2 = -1;
+const int PIN_STEP = 12;
+const int PIN_DIR = 13;
+const int PIN_MS1 = 4;
+const int PIN_MS2 = 5;
 const int PIN_ENABLE = 14;
-const int PIN_FAN = 13;
-
-// Inputs
-//const int PIN_CUTOFF_CLOSE = 0;
-//const int PIN_CUTOFF_OPEN = 3;
 
 EasyDriver stepper = EasyDriver(PIN_STEP, PIN_DIR, PIN_MS1, PIN_MS2, PIN_ENABLE);
 
@@ -28,19 +25,13 @@ const int DIRECTION_OPEN = EASYDRIVER_DIRECTION_REVERSE;
 
 const bool MQTT_SEND_STEPS = false;
 
-// Vars that are updatable via MQTT and saved into EEPROM...
+int STEPS_VERTICAL = 3000; // Number of full steps required to complete open/close sequence
 
-// If this number is not found in EEPROM, then we assume no EEPROM values exist/have been saved
-// and all other EEPROM values should be discarded/fallback to default values.
-// See loadFromEeprom()
-int EEPROM_MAGIC_NUMBER = 10001;
-int STEPS_VERTICAL = 15000; // Number of full steps required to complete open/close sequence
+int DELAY_CLOSE = 600; // In micros
+int MODE_CLOSE = EASYDRIVER_MODE_QUARTER_STEP;
 
-int DELAY_CLOSE = 500; // In micros
-int MODE_CLOSE = EASYDRIVER_MODE_FULL_STEP;
-
-int DELAY_OPEN = 500; // In micros
-int MODE_OPEN = EASYDRIVER_MODE_FULL_STEP;
+int DELAY_OPEN = 600; // In micros
+int MODE_OPEN = EASYDRIVER_MODE_QUARTER_STEP;
 
 // Locals
 int currentStep = 0;
@@ -51,11 +42,6 @@ bool isOpening = false;
 bool isClosing = false;
 
 void setup() {
-  // Cut off switches (not used in hardware, but implemented in case required in future)
-//  pinMode(PIN_CUTOFF_CLOSE, INPUT_PULLUP);
-//  pinMode(PIN_CUTOFF_OPEN, INPUT_PULLUP);
-  pinMode(PIN_FAN, OUTPUT);
-
   stepper.reset();
 
   Serial.begin(115200);
@@ -71,20 +57,12 @@ void setup() {
   mqttPublish(MQTT_TOPIC_ENABLED, 0);
   mqttPublish(MQTT_TOPIC_STATE, "closed");
   mqttPublish(MQTT_TOPIC_STEPS, currentStep);
-  loadFromEeprom();
 
   // Topic for controlling the stepper remotely
   mqttClient.subscribe(MQTT_TOPIC_CONTROL_ENABLED);
   mqttClient.subscribe(MQTT_TOPIC_CONTROL_DIRECTION);
   mqttClient.subscribe(MQTT_TOPIC_CONTROL_STEPFOR);
   mqttClient.subscribe(MQTT_TOPIC_CONTROL_BLINDS);
-
-  // Topics for updating EEPROM values remotely
-  mqttClient.subscribe(MQTT_TOPIC_CONTROL_MODE_OPEN);
-  mqttClient.subscribe(MQTT_TOPIC_CONTROL_MODE_CLOSE);
-  mqttClient.subscribe(MQTT_TOPIC_CONTROL_DELAY_OPEN);
-  mqttClient.subscribe(MQTT_TOPIC_CONTROL_DELAY_CLOSE);
-  mqttClient.subscribe(MQTT_TOPIC_CONTROL_STEPS_VERTICAL);
 }
 
 
@@ -96,6 +74,7 @@ void loop() {
     mqttReconnect();
   }
   mqttClient.loop();
+  ArduinoOTA.handle();
 }
 
 
@@ -123,26 +102,22 @@ void openBlinds() {
 /**
  * STEPPER WRAPPERS
  */
+int lastYield = 0;
 void stepFor(int steps) {
   setStepperEnabled(true);
   for (int i = 0; i < steps; i++) {
-//    Serial.print("STEP");
-//    Serial.println(i);
     // Stepping mode is effectively a multiplier on the desired number of steps
     // E.g. a quarter step mode, to achieve a full step we need to do 4x stepper steps
     for (int x = 0; x < currentMode; x++) {
       stepper.step();
+
+      if (millis() - lastYield > 80) {
+        yield(); // Don't block the CPU or ESP8266 will crash
+        lastYield = millis();
+      }
     }
 
     currentStep += stepDirection;
-//    if (stepDirection == DIRECTION_CLOSE && digitalRead(PIN_CUTOFF_CLOSE) == LOW) {
-//      Serial.println("ABORT CLOSE");
-//      break;
-//    }
-//    if (stepDirection == DIRECTION_OPEN && digitalRead(PIN_CUTOFF_OPEN) == LOW) {
-//      Serial.println("ABORT OPEN");
-//      break;
-//    }
     if (!stepperEnabled) {
       break;
     }
@@ -167,10 +142,8 @@ void setStepperEnabled(bool enabled) {
   stepper.enable(enabled);
   
   if (enabled) {
-    digitalWrite(PIN_FAN, HIGH);
     mqttPublish(MQTT_TOPIC_ENABLED, 1); 
   } else {
-    digitalWrite(PIN_FAN, LOW);
     mqttPublish(MQTT_TOPIC_ENABLED, 0); 
   }
   stepperEnabled = enabled;
@@ -195,14 +168,51 @@ void setStepperDirection(int direction) {
 void setupWifi() {
   Serial.print("Connecting to ");
   Serial.println(WIFI_SSID);
-
+  WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
 
+  ArduinoOTA.setHostname(MQTT_CLIENT_ID);
+  
+  ArduinoOTA.onStart([]() {
+    String type;
+    if (ArduinoOTA.getCommand() == U_FLASH) {
+      type = "sketch";
+    } else { // U_FS
+      type = "filesystem";
+    }
+
+    // NOTE: if updating FS this would be the place to unmount FS using FS.end()
+    Serial.println("Start updating " + type);
+  });
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nEnd");
+    ESP.reset();
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) {
+      Serial.println("Auth Failed");
+    } else if (error == OTA_BEGIN_ERROR) {
+      Serial.println("Begin Failed");
+    } else if (error == OTA_CONNECT_ERROR) {
+      Serial.println("Connect Failed");
+    } else if (error == OTA_RECEIVE_ERROR) {
+      Serial.println("Receive Failed");
+    } else if (error == OTA_END_ERROR) {
+      Serial.println("End Failed");
+    }
+  });
+
+  ArduinoOTA.begin();
   Serial.println();
   Serial.println("WiFi connected");
   Serial.print("IP address: ");
@@ -249,28 +259,9 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     } else if (value.equals("closed") && !isClosing) {
     // } else if (value.equals("closed")) {
       closeBlinds();
+    } else if (value.equals("stop")) {
+      setStepperEnabled(false);
     }
-  }
-
-  if (topicStr == MQTT_TOPIC_CONTROL_MODE_OPEN) {
-    MODE_OPEN = value.toInt();
-    saveToEeprom();
-  }
-  if (topicStr == MQTT_TOPIC_CONTROL_MODE_CLOSE) {
-    MODE_CLOSE = value.toInt();
-    saveToEeprom();
-  }
-  if (topicStr == MQTT_TOPIC_CONTROL_DELAY_OPEN) {
-    DELAY_OPEN = value.toInt();
-    saveToEeprom();
-  }
-  if (topicStr == MQTT_TOPIC_CONTROL_DELAY_CLOSE) {
-    DELAY_CLOSE = value.toInt();
-    saveToEeprom();
-  }
-  if (topicStr == MQTT_TOPIC_CONTROL_STEPS_VERTICAL) {
-    STEPS_VERTICAL = value.toInt();
-    saveToEeprom();
   }
 }
 
@@ -307,69 +298,4 @@ void mqttPublish(char *topic, String payload) {
   // Serial.println(payload);
 
   mqttClient.publish(topic, payload.c_str(), true);
-}
-
-
-/**
- * EEPROM HELPERS
- */
-
-void loadFromEeprom() {
-  EEPROM.begin(24);
-
-  //Read data from eeprom
-  int magicNumber;
-  int modeOpen;
-  int modeClose;
-  int delayOpen;
-  int delayClose;
-  int stepsVertical;
-
-  EEPROM.get(0, modeOpen);
-  EEPROM.get(4, modeClose);
-  EEPROM.get(8, delayOpen);
-  EEPROM.get(12, delayClose);
-  EEPROM.get(16, stepsVertical);
-  EEPROM.get(20, magicNumber);
-  EEPROM.end();
-
-  if (magicNumber == EEPROM_MAGIC_NUMBER) {
-    Serial.print("Successfully loaded config from eeprom");
-    MODE_OPEN = modeOpen;
-    MODE_CLOSE = modeClose;
-    DELAY_OPEN = delayOpen;
-    DELAY_CLOSE = delayClose;
-    STEPS_VERTICAL = stepsVertical;
-  } else {
-    Serial.print("EEPROM MAGIC NUMBER INCORRECT: ");
-    Serial.print(magicNumber);
-    Serial.print(" != ");
-    Serial.println(EEPROM_MAGIC_NUMBER);
-    Serial.print("Keeping default step config!");
-  }
-
-  mqttPublish(MQTT_TOPIC_MODE_OPEN, MODE_OPEN);
-  mqttPublish(MQTT_TOPIC_MODE_CLOSE, MODE_CLOSE);
-  mqttPublish(MQTT_TOPIC_DELAY_OPEN, DELAY_OPEN);
-  mqttPublish(MQTT_TOPIC_DELAY_CLOSE, DELAY_CLOSE);
-  mqttPublish(MQTT_TOPIC_STEPS_VERTICAL, STEPS_VERTICAL);
-}
-
-void saveToEeprom() {
-  EEPROM.begin(24);
-
-  EEPROM.put(0, MODE_OPEN);
-  EEPROM.put(4, MODE_CLOSE);
-  EEPROM.put(8, DELAY_OPEN);
-  EEPROM.put(12, DELAY_CLOSE);
-  EEPROM.put(16, STEPS_VERTICAL);
-  EEPROM.put(20, EEPROM_MAGIC_NUMBER);
-  EEPROM.commit();
-  EEPROM.end();
-
-  mqttPublish(MQTT_TOPIC_MODE_OPEN, MODE_OPEN);
-  mqttPublish(MQTT_TOPIC_MODE_CLOSE, MODE_CLOSE);
-  mqttPublish(MQTT_TOPIC_DELAY_OPEN, DELAY_OPEN);
-  mqttPublish(MQTT_TOPIC_DELAY_CLOSE, DELAY_CLOSE);
-  mqttPublish(MQTT_TOPIC_STEPS_VERTICAL, STEPS_VERTICAL);
 }
