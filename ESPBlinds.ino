@@ -12,6 +12,8 @@ const int PIN_DIR = 13;
 const int PIN_MS1 = 4;
 const int PIN_MS2 = 5;
 const int PIN_ENABLE = 14;
+const int PIN_BTN_UP = 5;
+const int PIN_BTN_DOWN = 4;
 
 EasyDriver stepper = EasyDriver(PIN_STEP, PIN_DIR, PIN_MS1, PIN_MS2, PIN_ENABLE);
 
@@ -23,9 +25,9 @@ PubSubClient mqttClient(espClient);
 const int DIRECTION_CLOSE = EASYDRIVER_DIRECTION_FORWARDS;
 const int DIRECTION_OPEN = EASYDRIVER_DIRECTION_REVERSE;
 
-const bool MQTT_SEND_STEPS = false;
+const bool MQTT_SEND_STEPS = true;
 
-int STEPS_VERTICAL = 3000; // Number of full steps required to complete open/close sequence
+int STEPS_VERTICAL = 2000; // Number of full steps required to complete open/close sequence
 
 int DELAY_CLOSE = 600; // In micros
 int MODE_CLOSE = EASYDRIVER_MODE_QUARTER_STEP;
@@ -42,6 +44,9 @@ bool isOpening = false;
 bool isClosing = false;
 
 void setup() {
+  pinMode(PIN_BTN_DOWN, INPUT_PULLUP);
+  pinMode(PIN_BTN_UP, INPUT_PULLUP);
+  
   stepper.reset();
 
   Serial.begin(115200);
@@ -65,6 +70,15 @@ void setup() {
   mqttClient.subscribe(MQTT_TOPIC_CONTROL_BLINDS);
 }
 
+void loop_old() {
+  if (digitalRead(PIN_BTN_DOWN) == LOW) {
+    Serial.println("LOW");
+    stepFor(1);
+  } else {
+    Serial.println("HIGH");
+  }
+  // delay(1000);
+}
 
 /**
  * MAIN LOOP
